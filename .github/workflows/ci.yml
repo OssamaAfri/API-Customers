@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    env:
+      MONGO_URI: ${{ secrets.MONGO_URI }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      NODE_ENV: test
+      SKIP_RABBITMQ: true
+
+    services:
+      mongo:
+        image: mongo:6
+        ports:
+          - 27017:27017
+      rabbitmq:
+        image: rabbitmq:3-management
+        ports:
+          - 5672:5672
+          - 15672:15672
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build Docker image
+        run: docker build -t api-clients .
+
+
+      - name: Save Docker image to tar file
+        run: docker save -o api-clients.tar api-clients
+
+      - name: Upload Docker image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-clients-image
+          path: api-clients.tar
+
+
+      - name: Security Audit
+        run: npm audit --audit-level=moderate
+
